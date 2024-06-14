@@ -1,0 +1,46 @@
+# data
+feeder: feeder.feeder_ntu.Feeder
+train_feeder_args:
+  data_path: data/NTU60_XSub.npz
+  split: train
+  debug: False
+  random_choose: False
+  random_shift: False
+  random_move: False
+  window_size: 100
+  normalization: False
+  random_rot: True
+  p_interval: [0.5, 1]
+  vel: False
+  bone: False
+
+# model
+model: model.models_v4.TeacherStudentNetwork
+model_args:
+  dim_in: 3
+  dim_feat: 256
+  depth: 5
+  pred_depth: 3
+  num_heads: 8
+  mlp_ratio: 4
+  num_frames: 100
+  num_joints: 25
+  patch_size: 1
+  t_patch_size: 4
+  qkv_bias: True
+  qk_scale: NULL
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.
+  alpha: 0.99
+  mask_ratio: 0.9
+
+# training
+epochs: 400
+warmup_epochs: 20
+batch_size: 56
+lr: 1e-3
+min_lr: 5e-4
+weight_decay: 0.05
+debug: True
+
