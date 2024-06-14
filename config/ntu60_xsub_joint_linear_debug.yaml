@@ -1,0 +1,57 @@
+# data
+feeder: feeder.feeder_ntu.Feeder
+train_feeder_args:
+  data_path: data/NTU60_XSub.npz
+  split: train
+  debug: False
+  random_choose: False
+  random_shift: False
+  random_move: False
+  window_size: 100
+  normalization: False
+  random_rot: True
+  p_interval: [0.5, 1]
+  vel: False
+  bone: False
+
+val_feeder_args:
+  data_path: data/NTU60_XSub.npz
+  split: test  
+  debug: False
+  window_size: 100
+  p_interval: [0.5, 1]
+  vel: False
+  bone: False
+
+# model
+model: model.models_v1_finetune.StudentMLPNetwork
+model_args:
+  dim_in: 3
+  dim_feat: 256
+  depth: 5
+  num_heads: 8
+  mlp_ratio: 4
+  num_frames: 100
+  num_joints: 25
+  patch_size: 1
+  t_patch_size: 4
+  qkv_bias: True
+  qk_scale: NULL
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.3
+  protocol: finetune
+  num_classes: 60
+
+# training
+epochs: 150
+warmup_epochs: 10
+batch_size: 1024
+lr: 1e-2
+layer_decay: 0.8
+smoothing: 0.1
+debug: True
+
+finetune: /home/ruihang/Skeleton/Code/Refactor/output_dir/checkpoint-studentspatial-399.pth
+
+
