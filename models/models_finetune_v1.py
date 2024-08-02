@@ -45,10 +45,10 @@ class StudentMLPNetwork(nn.Module):
         else:
             raise TypeError('Unrecognized evaluation protocol!')
 
-        # for param in self.studentParallel.parameters():
-        #     param.requires_grad = False
-        # for param in self.head.parameters():
-        #     param.requires_grad = True
+        for param in self.studentParallel.parameters():
+            param.requires_grad = False
+        for param in self.head.parameters():
+            param.requires_grad = True
 
     def forward(self, x, mask_ratio=0.9, motion_stride=1, motion_aware_tau=0.8):
         B, C, T, J, M = x.shape
