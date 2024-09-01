@@ -36,7 +36,7 @@ from util.datasets import build_dataset
 from util.pos_embed import interpolate_temp_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
-from finetune_engine_v1 import train_one_epoch, evaluate
+from finetune_engine import train_one_epoch, evaluate
 
 import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
@@ -55,15 +55,12 @@ def import_class(name):
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('Linear Probe Finetune 2D-3D lifting', add_help=False)
-    # parser.add_argument('--config', default='./config/ntu60_xsub_finetune_Linear_v1.yaml', help='path to the configuration file')
-    # parser.add_argument('--config', default='./config/ntu60_xsub_finetune_Finetune_v1.yaml', help='path to the configuration file')
-    # parser.add_argument('--config', default='./config/ntu60_xsub_finetune_Linear_v2.yaml', help='path to the configuration file')
-    parser.add_argument('--config', default='./config/ntu60_xsub_finetune_Finetune_v2.yaml', help='path to the configuration file')
-
+    parser = argparse.ArgumentParser('ParallelFormer Fine-tuning', add_help=False)
+    parser.add_argument('--config', default='./config/ntu60_xsub_finetune_parallel_GradNorm.yaml', help='path to the configuration file')
+    
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
-    parser.add_argument('--epochs', default=400, type=int)
+    parser.add_argument('--epochs', default=100, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
     parser.add_argument('--warmup_epochs', type=int, default=5, metavar='N', help='epochs to warmup LR')
     parser.add_argument('--accum_iter', default=1, type=int,
@@ -77,9 +74,6 @@ def get_args_parser():
     parser.add_argument('--model_args', default=dict(), help='the arguments of model')
     parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
-    
-    parser.add_argument('--motion_stride', default=1, type=float,
-                        help='')  
 
     # Optimizer parameters
     parser.add_argument('--enable_amp', action='store_true', default=False,
@@ -166,6 +160,7 @@ def ddp_setup(rank, world_size, args):
 
 
 def main(rank, world_size, args):
+    # misc.init_distributed_mode(args)
     ddp_setup(rank, world_size, args)
     torch.cuda.set_device(rank)
 
@@ -255,6 +250,45 @@ def main(rank, world_size, args):
     Model = import_class(args.model)
     model = Model(**args.model_args)
 
+    if args.model_checkpoint_path and not args.eval:
+        checkpoint = torch.load(args.model_checkpoint_path, map_location='cpu')
+        if global_rank == 0:
+            print("Load pre-trained checkpoint from: %s" % args.model_checkpoint_path)
+        checkpoint_model = checkpoint['model']
+        state_dict = model.studentParallel.state_dict()
+
+        checkpoint_student_parallel = {}
+        for key, value in checkpoint_model.items():
+            if 'studentParallel' in key:
+                checkpoint_student_parallel[key] = value
+
+        for k in ['head.weight', 'head.bias']:
+            if k in checkpoint_student_parallel and checkpoint_student_parallel[k].shape != state_dict[k].shape:
+                print(f"Removing key {k} from pretrained checkpoint")
+                del checkpoint_student_parallel[k]
+
+        # interpolate position embedding
+        interpolate_temp_embed(model.studentParallel, checkpoint_student_parallel)
+
+        msg = model.load_state_dict(checkpoint_student_parallel, strict=False)
+        if global_rank == 0:
+            print(msg)
+
+        missing_keys_check_passed = True
+        for k in set(msg.missing_keys):
+            if ('head' not in k) and ('pre_logits' not in k):
+                missing_keys_check_passed = False
+        assert missing_keys_check_passed == True
+
+        # # manually initialize fc layer
+        trunc_normal_(model.head.fc1.weight, std=2e-5)
+        trunc_normal_(model.head.fc2.weight, std=2e-5)
+
+    for _, p in model.named_parameters():
+        p.requires_grad = False
+    for _, p in model.head.named_parameters():
+        p.requires_grad = True
+
     model.to(device)
 
     model_without_ddp = model
@@ -283,14 +317,9 @@ def main(rank, world_size, args):
         print("accumulate grad iterations: %d" % args.accum_iter)
         print("effective batch size: %d" % eff_batch_size)
 
-    if args.model_checkpoint_path and not args.eval:
-        if args.distributed:
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[global_rank], find_unused_parameters=True)
-            model_without_ddp = model.module
-        checkpoint = torch.load(args.model_checkpoint_path, map_location='cpu')['model']
-        if rank == 0:
-            print("Load pre-trained checkpoint from: %s" % args.model_checkpoint_path)
-        model.module.studentParallel.load_state_dict(checkpoint)
+    if args.distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[global_rank])
+        model_without_ddp = model.module
 
     # build optimizer with layer-wise lr decay (lrd)
     param_groups = lrd.param_groups_lrd(model_without_ddp, args.weight_decay,
@@ -312,7 +341,10 @@ def main(rank, world_size, args):
     if rank == 0:
         print("criterion = %s" % str(criterion))
 
-    misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+    if os.path.isfile(args.resume):
+        misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+    else:
+        print("Start from scratch")
 
     if args.eval:
         test_stats = evaluate(data_loader_val, model, device)
@@ -335,6 +367,10 @@ def main(rank, world_size, args):
         )
         if args.output_dir:
             misc.save_model(
+                args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
+                loss_scaler=loss_scaler, epoch=epoch)
+
+        misc.save_model_latest(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 

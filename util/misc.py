@@ -377,7 +377,25 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
     else:
         client_state = {'epoch': epoch}
         model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
-        
+
+
+def save_model_latest(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
+    output_dir = Path(args.output_dir)
+    epoch_name = str(epoch)
+    if loss_scaler is not None:
+        checkpoint_paths = [output_dir / ('checkpoint-latest.pth')]
+        for checkpoint_path in checkpoint_paths:
+            to_save = {
+                'model': model_without_ddp.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'epoch': epoch,
+                'scaler': loss_scaler.state_dict(),
+                'args': args,
+            }
+            save_on_master(to_save, checkpoint_path)
+    else:
+        client_state = {'epoch': epoch}
+        model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-latest", client_state=client_state)
 
 
 def save_model_Encoder(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
@@ -441,13 +459,15 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
         else:
             checkpoint = torch.load(args.resume, map_location='cpu')
         model_without_ddp.load_state_dict(checkpoint['model'])
-        print("Resume checkpoint %s" % args.resume)
+        if is_main_process():
+            print("Resume checkpoint %s" % args.resume)
         if 'optimizer' in checkpoint and 'epoch' in checkpoint and not (hasattr(args, 'eval') and args.eval):
             optimizer.load_state_dict(checkpoint['optimizer'])
             args.start_epoch = checkpoint['epoch'] + 1
             if 'scaler' in checkpoint:
                 loss_scaler.load_state_dict(checkpoint['scaler'])
-            print("With optim & sched!")
+            if is_main_process():
+                print("With optim & sched!")
 
 
 def all_reduce_mean(x):

@@ -11,7 +11,7 @@ class StudentMLPNetwork(nn.Module):
 
     def __init__(self, dim_in=3, dim_feat=256, depth=5, num_heads=8, mlp_ratio=4, 
                     num_frames=100, num_joints=25, patch_size=1, t_patch_size=4, qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0., drop_path_rate=0., 
-                    norm_layer=nn.LayerNorm, protocol='finetune', mode='parallel', num_classes=60):
+                    norm_layer=nn.LayerNorm, protocol='linprobe', mode='parallel', num_classes=60):
         super().__init__()
 
         self.dim_in = dim_in
@@ -45,10 +45,6 @@ class StudentMLPNetwork(nn.Module):
         else:
             raise TypeError('Unrecognized evaluation protocol!')
 
-        for param in self.studentParallel.parameters():
-            param.requires_grad = False
-        for param in self.head.parameters():
-            param.requires_grad = True
 
     def forward(self, x, mask_ratio=0.9, motion_stride=1, motion_aware_tau=0.8):
         B, C, T, J, M = x.shape

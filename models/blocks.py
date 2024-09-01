@@ -256,6 +256,9 @@ class SkeleEmbed(nn.Module):
 
         self.num_patches = num_patches
 
+        self.grid_size = num_joints // patch_size
+        self.t_grid_size = num_frames // t_patch_size
+
         kernel_size = [t_patch_size, patch_size]
         self.proj = nn.Conv2d(dim_in, dim_feat, kernel_size=kernel_size, stride=kernel_size)
 

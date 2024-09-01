@@ -81,23 +81,23 @@ class TeacherStudentNetwork(nn.Module):
             # type: (Tensor, float, float, float, float) -> Tensor
             return _no_grad_trunc_normal_(tensor, mean, std, a, b)
         trunc_normal_(self.mask_token, std=.02)
-
+        
+        self.teacherParallel.load_state_dict(self.studentParallel.state_dict())
         for param_stu, param_tea in zip(
             self.studentParallel.parameters(), self.teacherParallel.parameters()
         ):
-            param_tea.data.copy_(param_stu.data)  # initialize
+            # param_tea.data.copy_(param_stu.data)  # initialize
             param_tea.requires_grad = False  # not update by gradient
 
         self.adjust_para = nn.Parameter(torch.tensor(1.0))
     
 
-    @torch.no_grad()
     def _ema_update_teacher_encoder(self):
         teacher_named_params = self.teacherParallel.named_parameters()
         student_named_params = self.studentParallel.named_parameters()
         # result = 0
         for (teacher_name, teacher_param), (student_name, student_param) in zip(teacher_named_params, student_named_params):
-            teacher_param.data.mul_(self.alpha).add_(student_param.data, alpha=1 - self.alpha)
+            teacher_param.data.mul_(self.alpha).add_(student_param.data, alpha=(1 - self.alpha))
             
 
     def patchify(self, imgs):
@@ -124,11 +124,10 @@ class TeacherStudentNetwork(nn.Module):
         studentEncoded, mask, ids_restore, x_motion = self.studentParallel(
                                 x, mask_ratio=mask_ratio, motion_stride=motion_stride, 
                                 motion_aware_tau=motion_aware_tau, setting='student')
-        _, T_s, J_s, _ = studentEncoded.shape
+        _, T_s, _, _ = studentEncoded.shape
 
         teacherEncoded, _, _, x_motion = self.teacherParallel(
-                                x, mask_ratio=0, motion_stride=motion_stride, 
-                                motion_aware_tau=motion_aware_tau, setting='teacher')
+                                x, mask_ratio=0, setting='teacher')
 
         mask_tokens = self.mask_token.repeat(M*N, T//self.t_patch_size-T_s, J//self.patch_size, 1)
         studentEncoded_ = torch.cat([studentEncoded[:, :, :, :], mask_tokens], dim=1)
@@ -148,8 +147,8 @@ class TeacherStudentNetwork(nn.Module):
 
         target = self.patchify(x_motion)
         return studentProject, target, studentMotionPredict, teacherMotionGT, mask
-        # return studentEncoded, teacherEncoded, studentEncodedMaskToken, studentProject, target, studentMotionPredict, teacherMotionGT, mask
-
+        
+        
 
 if __name__ == "__main__":
     B = 4

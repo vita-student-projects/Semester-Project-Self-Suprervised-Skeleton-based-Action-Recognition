@@ -35,21 +35,23 @@ model_args:
   attn_drop_rate: 0.
   drop_path_rate: 0.
   alpha: 0.9999
-  mode: coupling
+  mode: parallel
 
 # training
 epochs: 400
 warmup_epochs: 20
-batch_size: 30
+batch_size: 80
+num_workers: 8
 lr: 1e-3
 min_lr: 5e-4
 weight_decay: 0.05
-mask_ratio: 0.9
+mask_ratio: 0.5
 motion_stride: 1
 motion_aware_tau: 0.80
 norm_skes_loss: True
 
-output_dir: /media/os/data/ruihang/output_dir_coupling
-log_dir: /media/os/data/ruihang/output_dir_coupling
+output_dir: ./output_dir_parallel_GradNorm_1
+log_dir: ./output_dir_parallel_GradNorm_1
+resume: ./output_dir_parallel_GradNorm_1/checkpoint-latest.pth
 balanceLoss: False
-debug: True
+debug: False

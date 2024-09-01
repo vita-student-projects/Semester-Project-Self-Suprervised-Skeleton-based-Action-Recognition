@@ -5,11 +5,11 @@ train_feeder_args:
   split: train
   random_choose: False
   random_shift: False
-  random_move: False
-  random_spatial_flip: False
+  random_move: True
+  random_spatial_flip: True
   window_size: 120
   normalization: False
-  random_rot: False
+  random_rot: True
   p_interval: [0.5, 1]
   vel: False
   bone: False
@@ -38,23 +38,21 @@ model_args:
   qk_scale: NULL
   drop_rate: 0.
   attn_drop_rate: 0.
-  drop_path_rate: 0.3
+  drop_path_rate: 0.
   protocol: linprobe
   num_classes: 60
   mode: parallel
 
 # training
 epochs: 100
-warmup_epochs: 5
-batch_size: 80
-lr: 5e-4
-layer_decay: 0.8
-smoothing: 0.1
-motion_stride: 1
+warmup_epochs: 0
+batch_size: 128
+lr: 0.2
 
-model_checkpoint_path: /home/ruihang/Skeleton/Code/Codes/output_dir/checkpoint-studentParallel-0.pth
-output_dir: ./output_dir_finetune
-log_dir: ./output_dir_finetune
+model_checkpoint_path: ./output_dir_parallel_GradNorm_1/checkpoint-399.pth
+output_dir: ./output_dir_linprobe_parallel_GradNorm
+resume: ./output_dir_linprobe_parallel_GradNorm/checkpoint-latest.pth
+log_dir: ./output_dir_linprobe_parallel_GradNorm
 debug: False
 
 

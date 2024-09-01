@@ -15,21 +15,14 @@ train_feeder_args:
   vel: False
   bone: False
 
-val_feeder_args:
-  data_path: dataset/NTU60/NTU60_XSub_kf.npz
-  split: test  
-  use_mmap: True
-  window_size: 120
-  p_interval: [0.5, 1]
-  vel: False
-  bone: False
-
 # model
-model: models.models_finetune_v1.StudentMLPNetwork
+model: models.models_v1.TeacherStudentNetwork
 model_args:
   dim_in: 3
   dim_feat: 256
   depth: 8
+  pred_depth: 5
+  decoder_depth: 5
   num_heads: 8
   mlp_ratio: 4
   num_frames: 120
@@ -40,21 +33,24 @@ model_args:
   qk_scale: NULL
   drop_rate: 0.
   attn_drop_rate: 0.
-  drop_path_rate: 0.3
-  protocol: finetune
-  num_classes: 60
-  mode: parallel
+  drop_path_rate: 0.
+  alpha: 0.9999
+  mode: coupling
 
 # training
-epochs: 100
-warmup_epochs: 5
+epochs: 400
+warmup_epochs: 20
 batch_size: 80
-lr: 5e-4
-layer_decay: 0.8
-smoothing: 0.1
+lr: 1e-3
+min_lr: 5e-4
+weight_decay: 0.05
+mask_ratio: 0.5
 motion_stride: 1
+motion_aware_tau: 0.80
+norm_skes_loss: True
 
-model_checkpoint_path: /media/os/data/ruihang/output_dir_parallel/checkpoint-studentParallel-399.pth
-output_dir: /media/os/data/ruihang/output_dir_finetune_linprobe_parallel_class
-log_dir: /media/os/data/ruihang/output_dir_finetune_linprobe_parallel_class
+output_dir: ./output_dir_couple_GradNorm_1
+log_dir: ./output_dir_couple_GradNorm_1
+resume: ./output_dir_couple_GradNorm_1/checkpoint-latest.pth
+balanceLoss: False
 debug: False

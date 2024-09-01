@@ -19,6 +19,8 @@ import util.misc as misc
 import util.lr_sched as lr_sched
 from torch.autograd import grad
 
+import torch.nn.functional as F
+
 
 def decoder_loss(target, pred, mask, norm_skes_loss):
     """
@@ -46,10 +48,11 @@ def motion_loss(studentMotionPredict, teacherMotionGT, mask, norm_skes_loss):
     pred: [NM, TP*VP, t_patch_size * patch_size * C]
     mask: [NM, TP, VP], 0 is keep, 1 is remove,
     """
+    teacherMotionGT = teacherMotionGT.detach()
     if norm_skes_loss:
-        mean = studentMotionPredict.mean(dim=-1, keepdim=True)
-        var = studentMotionPredict.var(dim=-1, keepdim=True)
-        studentMotionPredict = (studentMotionPredict - mean) / (var + 1.0e-6) ** 0.5
+        # mean = studentMotionPredict.mean(dim=-1, keepdim=True)
+        # var = studentMotionPredict.var(dim=-1, keepdim=True)
+        # studentMotionPredict = (studentMotionPredict - mean) / (var + 1.0e-6) ** 0.5
 
         mean = teacherMotionGT.mean(dim=-1, keepdim=True)
         var = teacherMotionGT.var(dim=-1, keepdim=True)
@@ -57,9 +60,23 @@ def motion_loss(studentMotionPredict, teacherMotionGT, mask, norm_skes_loss):
 
     loss = (studentMotionPredict - teacherMotionGT) ** 2
     loss = loss.mean(dim=-1)  # [NM, TP * VP], mean loss per patch
+    # print(loss.shape)
     loss = loss.sum() / mask.sum()  # mean loss on removed joints
+    return loss.sum()
 
-    return loss
+# def motion_entropy_loss(studentMotionPredict, teacherMotionGT, center, norm_skes_loss):
+#     """
+#     imgs: [NM, TP*VP, t_patch_size * patch_size * C]
+#     pred: [NM, TP*VP, t_patch_size * patch_size * C]
+#     mask: [NM, TP, VP], 0 is keep, 1 is remove,
+#     """
+#     teacherMotionGT = teacherMotionGT.detach()
+#     teacher_probs = F.softmax((teacher_output - center) / tau_t, dim=2)
+#     student_probs = F.log_softmax(student_output / tau_s, dim=2)
+
+#     loss = - (teacher_probs * student_probs).sum(dim=2).mean()
+
+#     return loss
 
 def train_one_epoch(model: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -92,9 +109,10 @@ def train_one_epoch(model: torch.nn.Module,
 
             loss_stu_tea = motion_loss(studentMotionPredict, teacherMotionGT, mask, args.norm_skes_loss)
             loss_decoder = decoder_loss(target, studentProject, mask, args.norm_skes_loss)
-            loss_control = torch.sigmoid(model.module.adjust_para)
-            loss_control = torch.clamp(loss_control, max=0.8)
-            loss = loss_stu_tea*loss_control + loss_decoder*(1-loss_control)
+            # loss_control = torch.sigmoid(model.module.adjust_para)
+            # loss_control = torch.clamp(loss_control, max=0.8)
+            # loss = loss_stu_tea*loss_control + loss_decoder*(1-loss_control)
+            loss = loss_stu_tea * 10 + loss_decoder
 
         loss_value = loss.item()
 
@@ -102,33 +120,34 @@ def train_one_epoch(model: torch.nn.Module,
             print("Loss is {}, stopping training".format(loss_value))
             sys.exit(11)
 
-        if not args.balanceLoss:
-            loss /= accum_iter
-            loss_scaler(loss, optimizer, parameters=model.parameters(),
-                        update_grad=(data_iter_step + 1) % accum_iter == 0)
-            with torch.no_grad():
-                model.module._ema_update_teacher_encoder()
-            if (data_iter_step + 1) % accum_iter == 0:
-                optimizer.zero_grad()
+        optimizer.zero_grad()
+        # if not args.balanceLoss:
+        loss /= accum_iter
+        loss_scaler(loss, optimizer, parameters=model.parameters(),
+                    update_grad=(data_iter_step + 1) % accum_iter == 0)
+        with torch.no_grad():
+            model.module._ema_update_teacher_encoder()
+        if (data_iter_step + 1) % accum_iter == 0:
+            optimizer.zero_grad()
 
-            torch.cuda.synchronize()
-            metric_logger.update(loss=loss_value)
-            metric_logger.update(loss_control=loss_control)
-        else:
-            _, loss_balanced = loss_scaler(torch.stack([loss_decoder, loss_stu_tea]), optimizer, 
-                        parameters=model.parameters(), 
-                        shared_layers=model.module.studentParallel.norm,
-                        update_grad=(data_iter_step + 1) % accum_iter == 0)
-            with torch.no_grad():
-                model.module._ema_update_teacher_encoder()
-            if (data_iter_step + 1) % accum_iter == 0:
-                optimizer.zero_grad()
+        torch.cuda.synchronize()
+        metric_logger.update(loss=loss_value)
+        # metric_logger.update(loss_control=loss_control)
+        # else:
+        #     _, loss_balanced = loss_scaler(torch.stack([loss_decoder, loss_stu_tea]), optimizer, 
+        #                 parameters=model.parameters(), 
+        #                 shared_layers=model.module.studentParallel.norm,
+        #                 update_grad=(data_iter_step + 1) % accum_iter == 0)
+        #     with torch.no_grad():
+        #         model.module._ema_update_teacher_encoder()
+        #     if (data_iter_step + 1) % accum_iter == 0:
+        #         optimizer.zero_grad()
 
-            torch.cuda.synchronize()
-            metric_logger.update(loss_balanced=loss_balanced)
+        #     torch.cuda.synchronize()
+        #     metric_logger.update(loss_balanced=loss_balanced)
 
         metric_logger.update(loss_decoder=loss_decoder)
-        metric_logger.update(loss_motion=loss_stu_tea)
+        metric_logger.update(loss_stu_tea=loss_stu_tea)
             
 
         lr = optimizer.param_groups[0]["lr"]

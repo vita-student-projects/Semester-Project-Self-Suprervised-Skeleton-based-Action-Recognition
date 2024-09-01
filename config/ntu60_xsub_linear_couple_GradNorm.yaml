@@ -1,0 +1,58 @@
+# data
+feeder: feeder.feeder_ntu.Feeder
+train_feeder_args:
+  data_path: dataset/NTU60/NTU60_XSub_kf.npz
+  split: train
+  random_choose: False
+  random_shift: False
+  random_move: True
+  random_spatial_flip: True
+  window_size: 120
+  normalization: False
+  random_rot: True
+  p_interval: [0.5, 1]
+  vel: False
+  bone: False
+
+val_feeder_args:
+  data_path: dataset/NTU60/NTU60_XSub_kf.npz
+  split: test  
+  window_size: 120
+  p_interval: [0.5, 1]
+  vel: False
+  bone: False
+
+# model
+model: models.models_finetune_v1.StudentMLPNetwork
+model_args:
+  dim_in: 3
+  dim_feat: 256
+  depth: 8
+  num_heads: 8
+  mlp_ratio: 4
+  num_frames: 120
+  num_joints: 25
+  patch_size: 1
+  t_patch_size: 4
+  qkv_bias: True
+  qk_scale: NULL
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.
+  protocol: linprobe
+  num_classes: 60
+  mode: coupling
+
+# training
+epochs: 100
+warmup_epochs: 0
+batch_size: 128
+lr: 0.2
+
+model_checkpoint_path: ./output_dir_couple_GradNorm_1/checkpoint-399.pth
+output_dir: ./output_dir_linprobe_couple_GradNorm
+resume: ./output_dir_linprobe_couple_GradNorm/checkpoint-latest.pth
+log_dir: ./output_dir_linprobe_couple_GradNorm
+debug: False
+
+

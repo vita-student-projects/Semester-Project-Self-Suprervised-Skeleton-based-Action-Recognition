@@ -41,22 +41,20 @@ model_args:
   drop_rate: 0.
   attn_drop_rate: 0.
   drop_path_rate: 0.3
-  protocol: linprobe
+  protocol: finetune
   num_classes: 60
   mode: coupling
 
 # training
 epochs: 100
-warmup_epochs: 5
-batch_size: 38
-lr: 5e-4
+warmup_epochs: 20
+batch_size: 32
+lr: 5e-3
 layer_decay: 0.8
 smoothing: 0.1
-motion_stride: 1
 
-model_checkpoint_path: /media/os/data/ruihang/output_dir_coupling/checkpoint-studentParallel-399.pth
-output_dir: /media/os/data/ruihang/output_dir_finetune_linprobe_coupling_class
-log_dir: /media/os/data/ruihang/output_dir_finetune_linprobe_coupling_class
+model_checkpoint_path: ./output_dir_couple/checkpoint-399.pth
+output_dir: ./output_dir_finetune_couple
+resume: ./output_dir_finetune_couple/checkpoint-latest.pth
+log_dir: ./output_dir_finetune_couple
 debug: False
-
-

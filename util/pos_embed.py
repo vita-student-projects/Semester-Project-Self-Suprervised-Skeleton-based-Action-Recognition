@@ -120,9 +120,10 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 
 
 def interpolate_temp_embed(model, checkpoint_model):
-    if 'temp_embed' in checkpoint_model:
-        pos_embed_checkpoint = checkpoint_model['temp_embed']
+    if 'studentParallel.temp_embed' in checkpoint_model:
+        pos_embed_checkpoint = checkpoint_model['studentParallel.temp_embed']
         t_grid_size_checkpoint = pos_embed_checkpoint.shape[1]
+        # print(pos_embed_checkpoint.shape)
         t_grid_size_model = model.joints_embed.t_grid_size
 
         if t_grid_size_model != t_grid_size_checkpoint:
@@ -134,4 +135,6 @@ def interpolate_temp_embed(model, checkpoint_model):
             pos_tokens = pos_tokens.permute(0, 2, 3, 1)
             pos_embed_model = pos_tokens
             checkpoint_model['temp_embed'] = pos_embed_model
+    else:
+        print('No interpolate on temp_embed')
 
