@@ -1,0 +1,10 @@
+torch
+torchvision
+numpy
+PyYAML
+timm
+tensorboard
+torchinfo
+scikit-learn
+matplotlib
+Pillow

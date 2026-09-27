@@ -2,3 +2,16 @@ dataset/
 runai/
 GettingStarted_RCP-RunAI/
 nohup.out
+
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.pth
+*.pt
+*.ckpt
+*.npz
+*.npy
+output_dir*/
+runs/
+checkpoints/

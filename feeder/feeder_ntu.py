@@ -77,7 +77,7 @@ class Feeder(Dataset):
 
     def __len__(self):
         return len(self.label)
-        
+
 
     def __getitem__(self, index):
         data_numpy = self.data[index]
@@ -119,18 +119,18 @@ class Feeder(Dataset):
             raise TypeError("Unsupported data type. Only NumPy arrays or PyTorch tensors are supported.")
         # return torch.from_numpy(np.transpose(data_numpy, (3, 1, 2, 0))).float().clone().detach(), label, index
         return data_numpy.float().clone().detach(), label, index
-        
+
 
 
 
 if __name__ == '__main__':
 
-    # db = Feeder(data_path='/home/ruihang/Skeleton/Code/Refactor/data/NTU60_XSub.npz', split='train', window_size=100,
+    # Machine-specific example omitted for portability.
     #         random_shift=False, random_move=True, random_spatial_flip=True, random_rot=True)
-    db = Feeder(data_path='/home/ruihang/Skeleton/Code/Codes/dataset/NTU60/NTU60_XSub_kf.npz', 
+    db = Feeder(data_path='./data/NTU60_XSub_kf.npz',
                     split='train', window_size=120,
                     random_shift=False, random_move=True, random_spatial_flip=True, random_rot=True)
-    # db2 = Feeder(data_path='/home/ruihang/Skeleton/Code/Codes/dataset/NTU60/NTU60_XSub_kf2.npz', 
+    # Machine-specific example omitted for portability.
     #                 split='train', window_size=120,
     #                 random_shift=False, random_move=True, random_spatial_flip=True, random_rot=True)
     data_numpy, label, index = next(iter(db))
